@@ -34,6 +34,21 @@ class PortalSourceTests(unittest.TestCase):
         self.assertGreater(startup_log, handler_registration)
         self.assertIn("AP_SSID", source[startup_log:])
         self.assertIn("AP_IP_ADDRESS", source[startup_log:])
+        self.assertIn(
+            'ESP_LOGI(TAG, "SoftAP %s ready at http://%s/", AP_SSID, AP_IP_ADDRESS);',
+            source,
+        )
+
+    def test_uses_compatible_lwip_addresses_for_ap_network(self):
+        source = (ROOT / "main" / "portal.c").read_text(encoding="utf-8")
+        self.assertIn("ip4_addr_t parsed_ip", source)
+        self.assertIn("ip4addr_aton(AP_IP_ADDRESS, &parsed_ip)", source)
+        self.assertIn("ip_info.ip.addr = parsed_ip.addr", source)
+        self.assertIn("ip_info.gw.addr = parsed_ip.addr", source)
+        self.assertIn("ip4_addr_t netmask", source)
+        self.assertIn("IP4_ADDR(&netmask, 255, 255, 255, 0)", source)
+        self.assertIn("ip_info.netmask.addr = netmask.addr", source)
+        self.assertNotIn("ip4addr_aton(AP_IP_ADDRESS, &ip_info.ip)", source)
 
 
 if __name__ == "__main__":

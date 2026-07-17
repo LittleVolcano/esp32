@@ -22,11 +22,15 @@ static const char *TAG = "portal";
 static void configure_ap_network(esp_netif_t *ap_netif)
 {
     esp_netif_ip_info_t ip_info = {0};
+    ip4_addr_t parsed_ip = {0};
+    ip4_addr_t netmask = {0};
 
     ESP_ERROR_CHECK(ap_netif == NULL ? ESP_ERR_NO_MEM : ESP_OK);
-    ESP_ERROR_CHECK(ip4addr_aton(AP_IP_ADDRESS, &ip_info.ip) ? ESP_OK : ESP_ERR_INVALID_ARG);
-    ip_info.gw = ip_info.ip;
-    IP4_ADDR(&ip_info.netmask, 255, 255, 255, 0);
+    ESP_ERROR_CHECK(ip4addr_aton(AP_IP_ADDRESS, &parsed_ip) ? ESP_OK : ESP_ERR_INVALID_ARG);
+    ip_info.ip.addr = parsed_ip.addr;
+    ip_info.gw.addr = parsed_ip.addr;
+    IP4_ADDR(&netmask, 255, 255, 255, 0);
+    ip_info.netmask.addr = netmask.addr;
 
     ESP_ERROR_CHECK(esp_netif_dhcps_stop(ap_netif));
     ESP_ERROR_CHECK(esp_netif_set_ip_info(ap_netif, &ip_info));
@@ -83,5 +87,5 @@ void app_main(void)
         .handler = root_get_handler,
     };
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &root_route));
-    ESP_LOGI(TAG, "SoftAP " AP_SSID " ready at http://" AP_IP_ADDRESS "/");
+    ESP_LOGI(TAG, "SoftAP %s ready at http://%s/", AP_SSID, AP_IP_ADDRESS);
 }
