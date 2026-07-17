@@ -6,12 +6,15 @@
 #include "esp_err.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
+#include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
 #include "nvs_flash.h"
 
 #define AP_SSID "ESP32-Portal"
 #define AP_MAX_CONNECTIONS 4
+
+static const char *TAG = "portal";
 
 static esp_err_t root_get_handler(httpd_req_t *request)
 {
@@ -62,4 +65,5 @@ void app_main(void)
         .handler = root_get_handler,
     };
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &root_route));
+    ESP_LOGI(TAG, "SoftAP " AP_SSID " ready at http://192.168.4.1/");
 }
