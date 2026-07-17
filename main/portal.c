@@ -3,6 +3,8 @@
  */
 #include <string.h>
 
+#include "lwip/ip4_addr.h"
+
 #include "esp_err.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
@@ -11,10 +13,25 @@
 #include "esp_wifi.h"
 #include "nvs_flash.h"
 
-#define AP_SSID "ESP32-Portal"
+#define AP_SSID CONFIG_PORTAL_WIFI_SSID
+#define AP_IP_ADDRESS CONFIG_PORTAL_AP_IP_ADDRESS
 #define AP_MAX_CONNECTIONS 4
 
 static const char *TAG = "portal";
+
+static void configure_ap_network(esp_netif_t *ap_netif)
+{
+    esp_netif_ip_info_t ip_info = {0};
+
+    ESP_ERROR_CHECK(ap_netif == NULL ? ESP_ERR_NO_MEM : ESP_OK);
+    ESP_ERROR_CHECK(ip4addr_aton(AP_IP_ADDRESS, &ip_info.ip) ? ESP_OK : ESP_ERR_INVALID_ARG);
+    ip_info.gw = ip_info.ip;
+    IP4_ADDR(&ip_info.netmask, 255, 255, 255, 0);
+
+    ESP_ERROR_CHECK(esp_netif_dhcps_stop(ap_netif));
+    ESP_ERROR_CHECK(esp_netif_set_ip_info(ap_netif, &ip_info));
+    ESP_ERROR_CHECK(esp_netif_dhcps_start(ap_netif));
+}
 
 static esp_err_t root_get_handler(httpd_req_t *request)
 {
@@ -37,20 +54,21 @@ void app_main(void)
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_ap();
+    esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
+    configure_ap_network(ap_netif);
 
     wifi_init_config_t init_config = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&init_config));
 
-    wifi_config_t ap_config = {
-        .ap = {
-            .ssid = AP_SSID,
-            .ssid_len = strlen(AP_SSID),
-            .channel = 1,
-            .authmode = WIFI_AUTH_OPEN,
-            .max_connection = AP_MAX_CONNECTIONS,
-        },
-    };
+    wifi_config_t ap_config = {0};
+    size_t ap_ssid_len = strlen(AP_SSID);
+    ESP_ERROR_CHECK(ap_ssid_len <= sizeof(ap_config.ap.ssid) ? ESP_OK : ESP_ERR_INVALID_ARG);
+
+    memcpy(ap_config.ap.ssid, AP_SSID, ap_ssid_len);
+    ap_config.ap.ssid_len = ap_ssid_len;
+    ap_config.ap.channel = 1;
+    ap_config.ap.authmode = WIFI_AUTH_OPEN;
+    ap_config.ap.max_connection = AP_MAX_CONNECTIONS;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -65,5 +83,5 @@ void app_main(void)
         .handler = root_get_handler,
     };
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &root_route));
-    ESP_LOGI(TAG, "SoftAP " AP_SSID " ready at http://192.168.4.1/");
+    ESP_LOGI(TAG, "SoftAP " AP_SSID " ready at http://" AP_IP_ADDRESS "/");
 }
