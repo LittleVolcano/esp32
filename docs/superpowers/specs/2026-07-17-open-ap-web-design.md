@@ -38,4 +38,3 @@ The source regression test must pass with system Python. Firmware must be built 
 - DNS hijacking and automatic captive-portal popups.
 - Password protection, non-default DHCP ranges, and configuration UI.
 - Continuing Wi-Fi RSSI scanning.
-

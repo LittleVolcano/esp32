@@ -42,7 +42,7 @@ class PortalSourceTests(unittest.TestCase):
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `python3 -m unittest tests/test_portal_source.py -v`  
+Run: `python3 -m unittest tests/test_portal_source.py -v`
 Expected: FAIL with `FileNotFoundError` because `main/portal.c` does not yet exist.
 
 - [ ] **Step 3: Commit with the implementation after it passes**
@@ -122,7 +122,7 @@ idf_component_register(SRCS "portal.c"
 
 - [ ] **Step 5: Run the regression test to verify it passes**
 
-Run: `python3 -m unittest tests/test_portal_source.py -v`  
+Run: `python3 -m unittest tests/test_portal_source.py -v`
 Expected: PASS with one test and zero failures.
 
 ### Task 3: Document and build
@@ -140,12 +140,12 @@ Document `ESP32-Portal`, no password, and `http://192.168.4.1/`.
 
 - [ ] **Step 2: Run host regression test**
 
-Run: `python3 -m unittest tests/test_portal_source.py -v`  
+Run: `python3 -m unittest tests/test_portal_source.py -v`
 Expected: PASS with one test and zero failures.
 
 - [ ] **Step 3: Build firmware when ESP-IDF is available**
 
-Run: `idf.py build`  
+Run: `idf.py build`
 Expected: successful ESP-IDF build. If unavailable, record the missing command and do not claim a firmware build passed.
 
 - [ ] **Step 4: Commit implementation**
@@ -161,4 +161,3 @@ git commit -m "feat: serve web page from open access point"
 - Spec coverage: Task 2 implements SSID, open auth, AP network, root route, content type, and failure handling; Task 3 documents URL and build.
 - Placeholder scan: no TBD/TODO entries.
 - Type consistency: `root_get_handler` matches `httpd_uri_t.handler`; `app_main` is the ESP-IDF entry point.
-
