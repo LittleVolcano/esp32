@@ -123,4 +123,3 @@ git commit -m "feat: configure portal network in sdkconfig"
 
 - Kconfig defaults, source use, runtime validation, DHCP configuration, and user instructions each have a task.
 - No placeholder or extra portal behavior is included.
-

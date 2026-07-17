@@ -29,4 +29,3 @@ The root handler and route stay unchanged. The startup log uses the configured S
 ## Verification
 
 A source-level Python regression test covers configuration presence and use. idf.py build is run when the ESP-IDF CLI is available; this workspace currently does not provide it on PATH.
-
