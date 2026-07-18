@@ -16,7 +16,9 @@
 
 static const char *TAG = "wifi_scan";
 #define TARGET_SSID "ESP32-Portal"
-#define SCAN_INTERVAL_MS 2000
+#define TARGET_CHANNEL 6
+#define PASSIVE_SCAN_TIME_MS 2000
+#define SCAN_INTERVAL_MS 500
 
 static int compare_by_rssi(const void *left, const void *right)
 {
@@ -47,16 +49,15 @@ static const char *authmode_name(wifi_auth_mode_t authmode)
 static void scan_for_portal(void)
 {
     wifi_scan_config_t scan_config = {
-        .ssid = (uint8_t *)TARGET_SSID,
+        .ssid = NULL,
         .bssid = NULL,
-        .channel = 0,              /* 0 means all channels */
+        .channel = TARGET_CHANNEL,
         .show_hidden = false,
-        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
-        .scan_time.active.min = 100,
-        .scan_time.active.max = 300,
+        .scan_type = WIFI_SCAN_TYPE_PASSIVE,
+        .scan_time.passive = PASSIVE_SCAN_TIME_MS,
     };
 
-    ESP_LOGI(TAG, "Scanning for %s...", TARGET_SSID);
+    ESP_LOGI(TAG, "Listening on channel %u for %s...", TARGET_CHANNEL, TARGET_SSID);
     ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
 
     uint16_t ap_count = 0;
