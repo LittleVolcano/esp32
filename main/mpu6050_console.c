@@ -23,7 +23,6 @@ static void write_register(uint8_t reg, uint8_t value)
     const uint8_t message[] = {reg, value};
     ESP_ERROR_CHECK(i2c_master_write_to_device(I2C_PORT, MPU6050_ADDRESS, message, sizeof(message), pdMS_TO_TICKS(100)));
 }
-
 static void read_registers(uint8_t reg, uint8_t *data, size_t length)
 {
     ESP_ERROR_CHECK(i2c_master_write_read_device(I2C_PORT, MPU6050_ADDRESS, &reg, 1, data, length, pdMS_TO_TICKS(100)));
@@ -65,4 +64,3 @@ void app_main(void)
     initialize_mpu6050();
     while (true) { print_measurements(); vTaskDelay(pdMS_TO_TICKS(500)); }
 }
-
