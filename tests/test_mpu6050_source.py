@@ -23,11 +23,12 @@ class Mpu6050SourceTests(unittest.TestCase):
 
     def test_displays_measurements_on_ssd1306_oled(self):
         source = SOURCE.read_text(encoding="utf-8")
-        self.assertIn("#define OLED_ADDRESS 0x3C", source)
+        self.assertIn("#define OLED_ADDRESS_PRIMARY 0x3C", source)
+        self.assertIn("#define OLED_ADDRESS_SECONDARY 0x3D", source)
         self.assertIn("#define OLED_HEIGHT 32", source)
         self.assertIn("initialize_oled();", source)
         self.assertIn("display_measurements(&measurements);", source)
-        self.assertIn("oled_flush();", source)
+        self.assertIn("if (oled_flush() != ESP_OK)", source)
 
 
 if __name__ == "__main__":

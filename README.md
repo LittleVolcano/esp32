@@ -14,7 +14,7 @@ The firmware reads MPU6050 every 500 ms, prints acceleration, gyro, and temperat
 
 MPU6050 and OLED share the same I2C bus. Leave MPU6050 INT, XDA, and XCL unconnected. Use 3.3 V for both modules; do not use 5 V or GPIO8.
 
-The program expects a common 128x32 SSD1306 OLED at I2C address `0x3C`. If the display remains blank, check the controller/address printed on the module before changing `OLED_ADDRESS` or the initialization sequence in `main/mpu6050_console.c`.
+The program supports a common 128x32 SSD1306 OLED at I2C address `0x3C` or `0x3D`, and automatically detects either address. If neither address responds, the MPU6050 console output remains active and a warning is printed instead of restarting. Check the controller/address printed on the module before changing the SSD1306 initialization sequence in `main/mpu6050_console.c`.
 
 ## Build
 

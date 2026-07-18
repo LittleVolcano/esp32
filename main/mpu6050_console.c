@@ -20,7 +20,8 @@
 #define MPU6050_WHO_AM_I_VALUE 0x68
 
 /* Common settings for a 0.91 inch SSD1306 128x32 I2C OLED module. */
-#define OLED_ADDRESS 0x3C
+#define OLED_ADDRESS_PRIMARY 0x3C
+#define OLED_ADDRESS_SECONDARY 0x3D
 #define OLED_WIDTH 128
 #define OLED_HEIGHT 32
 #define OLED_PAGE_COUNT (OLED_HEIGHT / 8)
@@ -28,6 +29,8 @@
 
 static const char *TAG = "mpu6050";
 static uint8_t oled_buffer[OLED_BUFFER_SIZE];
+static uint8_t oled_address;
+static bool oled_available;
 
 typedef struct {
     float ax;
@@ -86,22 +89,29 @@ static void initialize_mpu6050(void)
     ESP_LOGI(TAG, "MPU6050 detected at 0x%02X", MPU6050_ADDRESS);
 }
 
-static void oled_write_command(uint8_t command)
+static esp_err_t oled_write_command(uint8_t command)
 {
     const uint8_t message[] = {0x00, command};
-    i2c_write(OLED_ADDRESS, message, sizeof(message));
+    return i2c_master_write_to_device(I2C_PORT, oled_address, message, sizeof(message),
+                                      pdMS_TO_TICKS(I2C_TIMEOUT_MS));
 }
 
-static void oled_write_data(const uint8_t *data, size_t length)
+static esp_err_t oled_write_data(const uint8_t *data, size_t length)
 {
     uint8_t message[17] = {0x40};
     while (length > 0) {
         const size_t chunk_length = length > sizeof(message) - 1 ? sizeof(message) - 1 : length;
         memcpy(&message[1], data, chunk_length);
-        i2c_write(OLED_ADDRESS, message, chunk_length + 1);
+        const esp_err_t result = i2c_master_write_to_device(I2C_PORT, oled_address, message,
+                                                             chunk_length + 1,
+                                                             pdMS_TO_TICKS(I2C_TIMEOUT_MS));
+        if (result != ESP_OK) {
+            return result;
+        }
         data += chunk_length;
         length -= chunk_length;
     }
+    return ESP_OK;
 }
 
 static void initialize_oled(void)
@@ -111,9 +121,26 @@ static void initialize_oled(void)
         0x8D, 0x14, 0x20, 0x00, 0xA1, 0xC8, 0xDA, 0x02,
         0x81, 0x8F, 0xD9, 0xF1, 0xDB, 0x40, 0xA4, 0xA6, 0xAF,
     };
-    for (size_t i = 0; i < sizeof(commands); ++i) {
-        oled_write_command(commands[i]);
+    static const uint8_t addresses[] = {OLED_ADDRESS_PRIMARY, OLED_ADDRESS_SECONDARY};
+
+    for (size_t candidate = 0; candidate < sizeof(addresses); ++candidate) {
+        oled_address = addresses[candidate];
+        bool initialized = true;
+        for (size_t i = 0; i < sizeof(commands); ++i) {
+            if (oled_write_command(commands[i]) != ESP_OK) {
+                initialized = false;
+                break;
+            }
+        }
+        if (initialized) {
+            oled_available = true;
+            ESP_LOGI(TAG, "SSD1306 OLED detected at 0x%02X", oled_address);
+            return;
+        }
     }
+
+    ESP_LOGW(TAG, "No OLED response at 0x%02X or 0x%02X; console output remains active",
+             OLED_ADDRESS_PRIMARY, OLED_ADDRESS_SECONDARY);
 }
 
 static void oled_set_pixel(uint8_t x, uint8_t y)
@@ -186,18 +213,32 @@ static void oled_draw_text(uint8_t x, uint8_t y, const char *text)
     }
 }
 
-static void oled_flush(void)
+static esp_err_t oled_flush(void)
 {
     for (uint8_t page = 0; page < OLED_PAGE_COUNT; ++page) {
-        oled_write_command(0xB0 | page);
-        oled_write_command(0x00);
-        oled_write_command(0x10);
-        oled_write_data(&oled_buffer[page * OLED_WIDTH], OLED_WIDTH);
+        esp_err_t result = oled_write_command(0xB0 | page);
+        if (result == ESP_OK) {
+            result = oled_write_command(0x00);
+        }
+        if (result == ESP_OK) {
+            result = oled_write_command(0x10);
+        }
+        if (result == ESP_OK) {
+            result = oled_write_data(&oled_buffer[page * OLED_WIDTH], OLED_WIDTH);
+        }
+        if (result != ESP_OK) {
+            return result;
+        }
     }
+    return ESP_OK;
 }
 
 static void display_measurements(const mpu6050_measurements_t *measurements)
 {
+    if (!oled_available) {
+        return;
+    }
+
     char line[22];
     memset(oled_buffer, 0, sizeof(oled_buffer));
 
@@ -209,7 +250,10 @@ static void display_measurements(const mpu6050_measurements_t *measurements)
     oled_draw_text(0, 16, line);
     snprintf(line, sizeof(line), "GZ:%+.1f DPS", measurements->gz);
     oled_draw_text(0, 24, line);
-    oled_flush();
+    if (oled_flush() != ESP_OK) {
+        oled_available = false;
+        ESP_LOGW(TAG, "OLED communication lost; console output remains active");
+    }
 }
 
 static mpu6050_measurements_t read_measurements(void)
