@@ -21,6 +21,14 @@ class Mpu6050SourceTests(unittest.TestCase):
         self.assertIn("gyro_dps=", source)
         self.assertIn("temperature_c=", source)
 
+    def test_displays_measurements_on_ssd1306_oled(self):
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn("#define OLED_ADDRESS 0x3C", source)
+        self.assertIn("#define OLED_HEIGHT 32", source)
+        self.assertIn("initialize_oled();", source)
+        self.assertIn("display_measurements(&measurements);", source)
+        self.assertIn("oled_flush();", source)
+
 
 if __name__ == "__main__":
     unittest.main()
