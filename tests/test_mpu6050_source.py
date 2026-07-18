@@ -13,7 +13,7 @@ class Mpu6050SourceTests(unittest.TestCase):
         self.assertIn("#define MPU6050_ADDRESS 0x68", source)
         self.assertIn("MPU6050_REG_WHO_AM_I", source)
         self.assertIn("MPU6050_REG_PWR_MGMT_1", source)
-        self.assertIn("pdMS_TO_TICKS(500)", source)
+        self.assertIn("pdMS_TO_TICKS(DISPLAY_REFRESH_MS)", source)
 
     def test_outputs_all_three_measurement_groups(self):
         source = SOURCE.read_text(encoding="utf-8")
@@ -29,6 +29,12 @@ class Mpu6050SourceTests(unittest.TestCase):
         self.assertIn("initialize_oled();", source)
         self.assertIn("display_measurements(&measurements);", source)
         self.assertIn("if (oled_flush() != ESP_OK)", source)
+        self.assertIn("oled_draw_accel_bar", source)
+        self.assertIn("#define DISPLAY_REFRESH_MS 100", source)
+        self.assertIn("remove_gravity", source)
+        self.assertIn("GRAVITY_FILTER_ALPHA", source)
+        self.assertIn("#define PEAK_HISTORY_DURATION_MS 5000", source)
+        self.assertIn("update_recent_acceleration_peaks", source)
 
 
 if __name__ == "__main__":

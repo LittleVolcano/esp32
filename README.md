@@ -1,6 +1,6 @@
 # ESP32-C3 SuperMini MPU6050 with OLED
 
-The firmware reads MPU6050 every 500 ms, prints acceleration, gyro, and temperature to the serial console, and displays the same values on a 0.91 inch SSD1306 I2C OLED.
+The firmware reads MPU6050 and refreshes three signed linear-acceleration progress bars (`AX`, `AY`, and `AZ`) on the OLED every 100 ms. A low-pass gravity estimate is subtracted before drawing the bars, so a stationary device settles at the centre line. Each bar has a taller vertical marker showing the largest absolute acceleration position from the preceding five seconds. The serial console prints raw acceleration, gyro, and temperature every 500 ms.
 
 ## Wiring
 

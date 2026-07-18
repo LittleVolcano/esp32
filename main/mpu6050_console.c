@@ -26,16 +26,42 @@
 #define OLED_HEIGHT 32
 #define OLED_PAGE_COUNT (OLED_HEIGHT / 8)
 #define OLED_BUFFER_SIZE (OLED_WIDTH * OLED_PAGE_COUNT)
+#define ACCEL_BAR_X 20
+#define ACCEL_BAR_WIDTH (OLED_WIDTH - ACCEL_BAR_X - 1)
+#define ACCEL_BAR_RANGE_G 1.0f
+#define GRAVITY_FILTER_ALPHA 0.90f
+#define DISPLAY_REFRESH_MS 100
+#define CONSOLE_REPORT_INTERVAL_MS 500
+#define PEAK_HISTORY_DURATION_MS 5000
+#define PEAK_HISTORY_SAMPLES (PEAK_HISTORY_DURATION_MS / DISPLAY_REFRESH_MS)
 
 static const char *TAG = "mpu6050";
 static uint8_t oled_buffer[OLED_BUFFER_SIZE];
 static uint8_t oled_address;
 static bool oled_available;
+static bool gravity_estimate_ready;
+static float gravity_ax;
+static float gravity_ay;
+static float gravity_az;
 
 typedef struct {
     float ax;
     float ay;
     float az;
+} acceleration_vector_t;
+
+static acceleration_vector_t acceleration_history[PEAK_HISTORY_SAMPLES];
+static acceleration_vector_t recent_peak_acceleration;
+static uint8_t acceleration_history_index;
+static uint8_t acceleration_history_count;
+
+typedef struct {
+    float ax;
+    float ay;
+    float az;
+    float linear_ax;
+    float linear_ay;
+    float linear_az;
     float temperature;
     float gx;
     float gy;
@@ -213,6 +239,113 @@ static void oled_draw_text(uint8_t x, uint8_t y, const char *text)
     }
 }
 
+static float absolute_float(float value)
+{
+    return value < 0.0f ? -value : value;
+}
+
+static int16_t accel_to_bar_x(float acceleration_g)
+{
+    const uint8_t bar_left = ACCEL_BAR_X;
+    const uint8_t bar_centre = bar_left + ACCEL_BAR_WIDTH / 2;
+    const float clamped_g = acceleration_g < -ACCEL_BAR_RANGE_G ? -ACCEL_BAR_RANGE_G :
+                            acceleration_g > ACCEL_BAR_RANGE_G ? ACCEL_BAR_RANGE_G :
+                            acceleration_g;
+    return bar_centre +
+           (int16_t)((clamped_g / ACCEL_BAR_RANGE_G) * (ACCEL_BAR_WIDTH / 2 - 2));
+}
+
+static void oled_draw_accel_bar(uint8_t y, const char *label, float acceleration_g,
+                                 float peak_acceleration_g)
+{
+    const uint8_t bar_left = ACCEL_BAR_X;
+    const uint8_t bar_right = ACCEL_BAR_X + ACCEL_BAR_WIDTH - 1;
+    const uint8_t bar_top = y + 1;
+    const uint8_t bar_bottom = y + 6;
+    const uint8_t bar_centre = bar_left + ACCEL_BAR_WIDTH / 2;
+    const int16_t marker = accel_to_bar_x(acceleration_g);
+    const int16_t peak_marker = accel_to_bar_x(peak_acceleration_g);
+
+    oled_draw_text(0, y, label);
+    for (uint8_t x = bar_left; x <= bar_right; ++x) {
+        oled_set_pixel(x, bar_top);
+        oled_set_pixel(x, bar_bottom);
+    }
+    for (uint8_t row = bar_top; row <= bar_bottom; ++row) {
+        oled_set_pixel(bar_left, row);
+        oled_set_pixel(bar_right, row);
+        oled_set_pixel(bar_centre, row);
+    }
+    if (marker < bar_centre) {
+        for (int16_t x = marker; x < bar_centre; ++x) {
+            for (uint8_t row = bar_top + 1; row < bar_bottom; ++row) {
+                oled_set_pixel(x, row);
+            }
+        }
+    } else {
+        for (int16_t x = bar_centre + 1; x <= marker; ++x) {
+            for (uint8_t row = bar_top + 1; row < bar_bottom; ++row) {
+                oled_set_pixel(x, row);
+            }
+        }
+    }
+    /* The taller line is the largest absolute acceleration during the last 5 seconds. */
+    for (uint8_t row = y; row <= y + 7; ++row) {
+        oled_set_pixel(peak_marker, row);
+    }
+}
+
+static void update_recent_acceleration_peaks(const mpu6050_measurements_t *measurements)
+{
+    acceleration_history[acceleration_history_index] = (acceleration_vector_t) {
+        .ax = measurements->linear_ax,
+        .ay = measurements->linear_ay,
+        .az = measurements->linear_az,
+    };
+    acceleration_history_index = (acceleration_history_index + 1) % PEAK_HISTORY_SAMPLES;
+    if (acceleration_history_count < PEAK_HISTORY_SAMPLES) {
+        ++acceleration_history_count;
+    }
+
+    recent_peak_acceleration = acceleration_history[0];
+    for (uint8_t i = 1; i < acceleration_history_count; ++i) {
+        if (absolute_float(acceleration_history[i].ax) >
+            absolute_float(recent_peak_acceleration.ax)) {
+            recent_peak_acceleration.ax = acceleration_history[i].ax;
+        }
+        if (absolute_float(acceleration_history[i].ay) >
+            absolute_float(recent_peak_acceleration.ay)) {
+            recent_peak_acceleration.ay = acceleration_history[i].ay;
+        }
+        if (absolute_float(acceleration_history[i].az) >
+            absolute_float(recent_peak_acceleration.az)) {
+            recent_peak_acceleration.az = acceleration_history[i].az;
+        }
+    }
+}
+
+static void remove_gravity(mpu6050_measurements_t *measurements)
+{
+    if (!gravity_estimate_ready) {
+        gravity_ax = measurements->ax;
+        gravity_ay = measurements->ay;
+        gravity_az = measurements->az;
+        gravity_estimate_ready = true;
+        return;
+    }
+
+    measurements->linear_ax = measurements->ax - gravity_ax;
+    measurements->linear_ay = measurements->ay - gravity_ay;
+    measurements->linear_az = measurements->az - gravity_az;
+
+    gravity_ax = GRAVITY_FILTER_ALPHA * gravity_ax +
+                 (1.0f - GRAVITY_FILTER_ALPHA) * measurements->ax;
+    gravity_ay = GRAVITY_FILTER_ALPHA * gravity_ay +
+                 (1.0f - GRAVITY_FILTER_ALPHA) * measurements->ay;
+    gravity_az = GRAVITY_FILTER_ALPHA * gravity_az +
+                 (1.0f - GRAVITY_FILTER_ALPHA) * measurements->az;
+}
+
 static esp_err_t oled_flush(void)
 {
     for (uint8_t page = 0; page < OLED_PAGE_COUNT; ++page) {
@@ -235,21 +368,16 @@ static esp_err_t oled_flush(void)
 
 static void display_measurements(const mpu6050_measurements_t *measurements)
 {
+    update_recent_acceleration_peaks(measurements);
     if (!oled_available) {
         return;
     }
 
-    char line[22];
     memset(oled_buffer, 0, sizeof(oled_buffer));
 
-    snprintf(line, sizeof(line), "AX:%+.2f AY:%+.2f", measurements->ax, measurements->ay);
-    oled_draw_text(0, 0, line);
-    snprintf(line, sizeof(line), "AZ:%+.2f T:%+.1fC", measurements->az, measurements->temperature);
-    oled_draw_text(0, 8, line);
-    snprintf(line, sizeof(line), "GX:%+.1f GY:%+.1f", measurements->gx, measurements->gy);
-    oled_draw_text(0, 16, line);
-    snprintf(line, sizeof(line), "GZ:%+.1f DPS", measurements->gz);
-    oled_draw_text(0, 24, line);
+    oled_draw_accel_bar(0, "AX", measurements->linear_ax, recent_peak_acceleration.ax);
+    oled_draw_accel_bar(11, "AY", measurements->linear_ay, recent_peak_acceleration.ay);
+    oled_draw_accel_bar(22, "AZ", measurements->linear_az, recent_peak_acceleration.az);
     if (oled_flush() != ESP_OK) {
         oled_available = false;
         ESP_LOGW(TAG, "OLED communication lost; console output remains active");
@@ -260,7 +388,7 @@ static mpu6050_measurements_t read_measurements(void)
 {
     uint8_t data[14] = {0};
     read_mpu6050_registers(MPU6050_REG_ACCEL_XOUT_H, data, sizeof(data));
-    return (mpu6050_measurements_t) {
+    mpu6050_measurements_t measurements = {
         .ax = read_be16(&data[0]) / 16384.0f,
         .ay = read_be16(&data[2]) / 16384.0f,
         .az = read_be16(&data[4]) / 16384.0f,
@@ -269,6 +397,8 @@ static mpu6050_measurements_t read_measurements(void)
         .gy = read_be16(&data[10]) / 131.0f,
         .gz = read_be16(&data[12]) / 131.0f,
     };
+    remove_gravity(&measurements);
+    return measurements;
 }
 
 static void report_measurements(const mpu6050_measurements_t *measurements)
@@ -281,14 +411,20 @@ static void report_measurements(const mpu6050_measurements_t *measurements)
 
 void app_main(void)
 {
+    uint32_t elapsed_since_console_report_ms = CONSOLE_REPORT_INTERVAL_MS;
+
     initialize_i2c();
     initialize_mpu6050();
     initialize_oled();
 
     while (true) {
         const mpu6050_measurements_t measurements = read_measurements();
-        report_measurements(&measurements);
+        if (elapsed_since_console_report_ms >= CONSOLE_REPORT_INTERVAL_MS) {
+            report_measurements(&measurements);
+            elapsed_since_console_report_ms = 0;
+        }
         display_measurements(&measurements);
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(DISPLAY_REFRESH_MS));
+        elapsed_since_console_report_ms += DISPLAY_REFRESH_MS;
     }
 }
