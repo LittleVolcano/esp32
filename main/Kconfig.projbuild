@@ -1,11 +1,27 @@
-menu "Portal Configuration"
+menu "Audio Motor PWM Configuration"
 
-    config PORTAL_WIFI_SSID
-        string "Wi-Fi name"
-        default "ESP32-Portal"
+    config AUDIO_MOTOR_MIN_FREQUENCY_HZ
+        int "Minimum detected frequency (Hz)"
+        range 20 4000
+        default 70
+        help
+            A tone at or below this frequency produces the minimum motor duty.
 
-    config PORTAL_AP_IP_ADDRESS
-        string "AP IP address"
-        default "192.168.4.1"
+    config AUDIO_MOTOR_MAX_FREQUENCY_HZ
+        int "Maximum detected frequency (Hz)"
+        range 100 8000
+        default 530
+        help
+            A tone at or above this frequency produces the maximum motor duty.
+
+    config AUDIO_MOTOR_MIN_DUTY_PERCENT
+        int "Minimum motor duty (%)"
+        range 1 75
+        default 10
+
+    config AUDIO_MOTOR_MAX_DUTY_PERCENT
+        int "Maximum motor duty (%)"
+        range 2 75
+        default 75
 
 endmenu
