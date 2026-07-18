@@ -1,0 +1,31 @@
+I (409) wifi:wifi driver task: 3fca1828, prio:23, stack:6656, core=0
+I (409) wifi:wifi firmware version: 00ad238
+I (409) wifi:wifi certification version: v7.0
+I (409) wifi:config NVS flash: enabled
+I (409) wifi:config nano formatting: disabled
+I (419) wifi:Init data frame dynamic rx buffer num: 32
+I (419) wifi:Init static rx mgmt buffer num: 5
+I (429) wifi:Init management short buffer num: 32
+I (429) wifi:Init dynamic tx buffer num: 32
+I (439) wifi:Init static tx FG buffer num: 2
+I (439) wifi:Init static rx buffer size: 1600
+I (439) wifi:Init static rx buffer num: 10
+I (449) wifi:Init dynamic rx buffer num: 32
+I (449) wifi_init: rx ba win: 6
+I (449) wifi_init: accept mbox: 6
+I (459) wifi_init: tcpip mbox: 32
+I (459) wifi_init: udp mbox: 6
+I (459) wifi_init: tcp mbox: 6
+I (469) wifi_init: tcp tx win: 5760
+I (469) wifi_init: tcp rx win: 5760
+I (469) wifi_init: tcp mss: 1440
+I (469) wifi_init: WiFi IRAM OP enabled
+I (479) wifi_init: WiFi RX IRAM OP enabled
+I (489) phy_init: phy_version 1235,8bd8c6fc,Apr 13 2026,18:46:20
+I (519) wifi:mode : softAP (14:63:93:92:3e:b5)
+I (519) wifi:Total power save buffer number: 16
+I (519) wifi:Init max length of beacon: 752/752
+I (519) wifi:Init max length of beacon: 752/752
+I (529) esp_netif_lwip: DHCP server started on interface WIFI_AP_DEF with IP: 192.168.4.1
+I (539) portal: SoftAP ESP32-Portal ready at http://192.168.4.1/
+I (539) main_task: Returned from app_main()
