@@ -20,6 +20,8 @@ class PortalSourceTests(unittest.TestCase):
         source = (ROOT / "main" / "portal.c").read_text(encoding="utf-8")
         self.assertIn('#define AP_SSID CONFIG_PORTAL_WIFI_SSID', source)
         self.assertIn('.authmode = WIFI_AUTH_OPEN', source)
+        self.assertIn('.ssid_hidden = 0', source)
+        self.assertIn('esp_wifi_set_max_tx_power', source)
         self.assertIn('.uri = "/"', source)
         self.assertIn('"text/html; charset=utf-8"', source)
 
@@ -49,6 +51,13 @@ class PortalSourceTests(unittest.TestCase):
         self.assertIn("IP4_ADDR(&netmask, 255, 255, 255, 0)", source)
         self.assertIn("ip_info.netmask.addr = netmask.addr", source)
         self.assertNotIn("ip4addr_aton(AP_IP_ADDRESS, &ip_info.ip)", source)
+
+    def test_logs_ap_events_and_periodic_status(self):
+        source = (ROOT / "main" / "portal.c").read_text(encoding="utf-8")
+        self.assertIn("WIFI_EVENT_AP_START", source)
+        self.assertIn("WIFI_EVENT_AP_STOP", source)
+        self.assertIn("AP heartbeat", source)
+        self.assertIn("esp_wifi_get_max_tx_power", source)
 
 
 if __name__ == "__main__":
