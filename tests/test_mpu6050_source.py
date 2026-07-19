@@ -9,7 +9,7 @@ class Mpu6050SourceTests(unittest.TestCase):
     def test_configures_c3_supermini_i2c_and_mpu6050(self):
         source = SOURCE.read_text(encoding="utf-8")
         self.assertIn("#define I2C_SDA_GPIO 4", source)
-        self.assertIn("#define I2C_SCL_GPIO 5", source)
+        self.assertIn("#define I2C_SCL_GPIO 3", source)
         self.assertIn("#define MPU6050_ADDRESS 0x68", source)
         self.assertIn("MPU6050_REG_WHO_AM_I", source)
         self.assertIn("MPU6050_REG_PWR_MGMT_1", source)

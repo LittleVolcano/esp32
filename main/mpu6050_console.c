@@ -11,7 +11,7 @@
 
 #define I2C_PORT I2C_NUM_0
 #define I2C_SDA_GPIO 4
-#define I2C_SCL_GPIO 5
+#define I2C_SCL_GPIO 3
 #define I2C_TIMEOUT_MS 100
 
 #define MPU6050_ADDRESS 0x68

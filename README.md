@@ -48,7 +48,7 @@ MPU6050 和 OLED 共用 I2C 总线：
 | 3V3 | VCC | VCC |
 | GND | GND | GND |
 | GPIO4 | SDA | SDA |
-| GPIO5 | SCL | SCL |
+| GPIO3 | SCL | SCL |
 | GND | AD0 | - |
 
 - MPU6050 的 `INT`、`XDA`、`XCL` 不接。
