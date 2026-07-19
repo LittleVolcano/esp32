@@ -1,8 +1,47 @@
-# ESP32-C3 SuperMini MPU6050 with OLED
+# ESP32-C3 SuperMini MPU6050 车载加速度显示
 
-The firmware reads MPU6050 and refreshes three signed linear-acceleration progress bars (`AX`, `AY`, and `AZ`) on the OLED every 100 ms. A low-pass gravity estimate is subtracted before drawing the bars, so a stationary device settles at the centre line. Each bar has a taller vertical marker showing the largest absolute acceleration position from the preceding five seconds. The serial console prints raw acceleration, gyro, and temperature every 500 ms.
+本程序读取 MPU6050 的三轴加速度，在 0.91 英寸 SSD1306 OLED 上显示加速度变化进度条。适合安装在车辆上观察加速、刹车、转弯或明显颠簸带来的整体加速度变化。
 
-## Wiring
+## 显示内容
+
+OLED 每 100 ms 刷新一次：
+
+- `ACC`：当前加速度变化值，单位为 `G`，显示 1 位小数。
+- `P`：最近 5 秒内的最大加速度变化值，显示 1 位小数。
+- 进度条：从左向右显示 `ACC`，右端满格为 `1.5G`。
+- 峰值线：进度条上的竖线，位置对应 `P`。
+- 小猫：进度条下方显示由参考横躺小猫自动裁剪、缩放得到的 32x18 单色点阵图案。状态由峰值竖线 `P` 决定：`P` 低于 `0.50G` 时保持静止；达到或超过 `0.50G` 时，图案每 200 ms 左右摇晃一次。
+- 闪烁：当前值突破峰值线且大于 `1G` 时，OLED 会反色闪烁约 0.5 秒。
+
+串口每 500 ms 输出原始三轴加速度、角速度和温度，供调试使用。
+
+## 测量方式
+
+开机后的前 2 秒必须保持车辆和传感器静止。程序会连续采集 20 个样本，计算三轴加速度合成值：
+
+```text
+sqrt(ax * ax + ay * ay + az * az)
+```
+
+这段时间的平均值作为初始重力基线。之后显示的数值为：
+
+```text
+abs(当前三轴合加速度 - 初始重力基线)
+```
+
+该方法不区分方向变化，也不使用角速度参与 OLED 显示，因此旋转传感器但合加速度总量不变时，进度条不会明显变化。
+
+为减少短时噪声：
+
+- 小于 `0.02G` 的变化按 0 处理。
+- 变化需要持续至少 `200 ms` 才进入显示。
+- 显示值使用快速低通平滑。
+
+注意：标量合成方法对横向加速度的灵敏度低于按方向计算的方式。例如横向 `0.2G` 加速度会使总量从约 `1.00G` 变为约 `1.02G`。
+
+## 接线
+
+MPU6050 和 OLED 共用 I2C 总线：
 
 | ESP32-C3 SuperMini | MPU6050 | 0.91 inch OLED |
 | --- | --- | --- |
@@ -12,14 +51,30 @@ The firmware reads MPU6050 and refreshes three signed linear-acceleration progre
 | GPIO5 | SCL | SCL |
 | GND | AD0 | - |
 
-MPU6050 and OLED share the same I2C bus. Leave MPU6050 INT, XDA, and XCL unconnected. Use 3.3 V for both modules; do not use 5 V or GPIO8.
+- MPU6050 的 `INT`、`XDA`、`XCL` 不接。
+- 两个模块都使用 `3.3V`，不要接 `5V`。
+- OLED 支持常见 SSD1306 I2C 地址 `0x3C` 和 `0x3D`，程序会自动探测。
+- 若 OLED 未接或地址不正确，MPU6050 的串口输出仍会继续运行。
 
-The program supports a common 128x32 SSD1306 OLED at I2C address `0x3C` or `0x3D`, and automatically detects either address. If neither address responds, the MPU6050 console output remains active and a warning is printed instead of restarting. Check the controller/address printed on the module before changing the SSD1306 initialization sequence in `main/mpu6050_console.c`.
+## 串口日志
 
-## Build
+正常启动后会看到类似日志：
+
+```text
+I (...) mpu6050: MPU6050 detected at 0x68
+I (...) mpu6050: SSD1306 OLED detected at 0x3C
+I (...) mpu6050: Initial acceleration baseline: 1.000G
+I (...) mpu6050: accel_g=(...) gyro_dps=(...) temperature_c=(...)
+```
+
+`Initial acceleration baseline` 出现后表示初始 2 秒校准已完成。
+
+## 编译与烧录
 
 ```bash
 idf.py set-target esp32c3
 idf.py build
 idf.py -p PORT flash monitor
 ```
+
+将 `PORT` 替换为开发板对应串口，例如 macOS 上常见的 `/dev/cu.usbmodem*`。
