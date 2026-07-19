@@ -5,59 +5,35 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class PortalSourceTests(unittest.TestCase):
-    def test_uses_sdkconfig_for_ssid_and_ap_address(self):
-        kconfig = (ROOT / "main" / "Kconfig.projbuild").read_text(encoding="utf-8")
+class SoftApSourceTests(unittest.TestCase):
+    def test_matches_the_minimal_arduino_softap_configuration(self):
         source = (ROOT / "main" / "portal.c").read_text(encoding="utf-8")
-        self.assertIn('config PORTAL_WIFI_SSID', kconfig)
-        self.assertIn('default "ESP32-Portal"', kconfig)
-        self.assertIn('config PORTAL_AP_IP_ADDRESS', kconfig)
-        self.assertIn('default "192.168.4.1"', kconfig)
-        self.assertIn('CONFIG_PORTAL_WIFI_SSID', source)
-        self.assertIn('CONFIG_PORTAL_AP_IP_ADDRESS', source)
 
-    def test_configures_open_portal_and_root_html_handler(self):
+        self.assertIn('#define AP_SSID "ESP_AP"', source)
+        self.assertIn('#define AP_PASSWORD "123456789"', source)
+        self.assertIn('#define AP_CHANNEL 1', source)
+        self.assertIn('.authmode = WIFI_AUTH_WPA2_PSK', source)
+        self.assertIn('esp_wifi_set_mode(WIFI_MODE_AP)', source)
+        self.assertIn('esp_wifi_set_config(WIFI_IF_AP, &ap_config)', source)
+        self.assertIn('esp_wifi_start()', source)
+
+    def test_serves_a_root_page_without_background_diagnostic_work(self):
         source = (ROOT / "main" / "portal.c").read_text(encoding="utf-8")
-        self.assertIn('#define AP_SSID CONFIG_PORTAL_WIFI_SSID', source)
-        self.assertIn('.authmode = WIFI_AUTH_OPEN', source)
-        self.assertIn('.ssid_hidden = 0', source)
-        self.assertIn('esp_wifi_set_max_tx_power', source)
+
+        self.assertIn('esp_http_server.h', source)
+        self.assertIn('httpd_start(&server, &server_config)', source)
+        self.assertIn('httpd_register_uri_handler(server, &root_route)', source)
         self.assertIn('.uri = "/"', source)
         self.assertIn('"text/html; charset=utf-8"', source)
+        self.assertIn('.uri = "/favicon.ico"', source)
+        self.assertIn('httpd_resp_set_status(request, "204 No Content")', source)
+        self.assertNotIn('xTaskCreate', source)
+        self.assertNotIn('esp_netif_set_ip_info', source)
 
-    def test_logs_portal_startup_with_ssid_and_url(self):
+    def test_keeps_wifi_settings_in_ram_for_the_test(self):
         source = (ROOT / "main" / "portal.c").read_text(encoding="utf-8")
-        handler_registration = source.index(
-            "ESP_ERROR_CHECK(httpd_register_uri_handler(server, &root_route));"
-        )
-        self.assertIn("ESP_LOGI(", source)
-        startup_log = source.index("ESP_LOGI(", handler_registration)
 
-        self.assertGreater(startup_log, handler_registration)
-        self.assertIn("AP_SSID", source[startup_log:])
-        self.assertIn("AP_IP_ADDRESS", source[startup_log:])
-        self.assertIn(
-            'ESP_LOGI(TAG, "SoftAP %s ready at http://%s/", AP_SSID, AP_IP_ADDRESS);',
-            source,
-        )
-
-    def test_uses_compatible_lwip_addresses_for_ap_network(self):
-        source = (ROOT / "main" / "portal.c").read_text(encoding="utf-8")
-        self.assertIn("ip4_addr_t parsed_ip", source)
-        self.assertIn("ip4addr_aton(AP_IP_ADDRESS, &parsed_ip)", source)
-        self.assertIn("ip_info.ip.addr = parsed_ip.addr", source)
-        self.assertIn("ip_info.gw.addr = parsed_ip.addr", source)
-        self.assertIn("ip4_addr_t netmask", source)
-        self.assertIn("IP4_ADDR(&netmask, 255, 255, 255, 0)", source)
-        self.assertIn("ip_info.netmask.addr = netmask.addr", source)
-        self.assertNotIn("ip4addr_aton(AP_IP_ADDRESS, &ip_info.ip)", source)
-
-    def test_logs_ap_events_and_periodic_status(self):
-        source = (ROOT / "main" / "portal.c").read_text(encoding="utf-8")
-        self.assertIn("WIFI_EVENT_AP_START", source)
-        self.assertIn("WIFI_EVENT_AP_STOP", source)
-        self.assertIn("AP heartbeat", source)
-        self.assertIn("esp_wifi_get_max_tx_power", source)
+        self.assertIn('esp_wifi_set_storage(WIFI_STORAGE_RAM)', source)
 
 
 if __name__ == "__main__":
